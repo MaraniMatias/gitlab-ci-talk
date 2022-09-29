@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+
+    <title>Talking about Gitlab CI config</title>
+
+    <link rel="stylesheet" href="./reset.css" />
+    <link rel="stylesheet" href="./reveal.css" />
+    <!-- <link rel="stylesheet" href="dist/theme/white.css" /> -->
+    <link rel="stylesheet" href="./theme/black.css" />
+
+    <!-- Theme used for syntax highlighted code -->
+    <!--
+    <link 
+       rel="stylesheet" 
+       href="./node_modules/highlight.js/styles/atom-one-light.css" 
+    /> -->
+    <link rel="stylesheet" href="./highlight.js/styles/atom-one-dark.css" />
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section
+          data-background-image="https://raw.githubusercontent.com/MaraniMatias/gitlab-ci-talk/master/image/gitlab-cover.jpg"
+        ></section>
+        <section>
+          The pipelines
+          <img
+            data-src="https://raw.githubusercontent.com/MaraniMatias/gitlab-ci-talk/master/image/pipelines.png"
+          />
+        </section>
+
+        <section>
+          <p>Previously, you need to have GitLab Runner installed</p>
+          <small>
+            You're going to <i>Settings > CI / CD</i> on your Gitlab project’s,
+            expanding the <i>Runners</i> section, and clicking
+            <i>Show runner installation instructions</i>
+          </small>
+        </section>
+
+        <section>
+          <section>
+            <p>
+              Make a
+              <i style="background-color: gray; padding: 0 0.5rem"
+                >.gitlab-ci.yml</i
+              >
+              config file.
+            </p>
+            <small>
+              En la pagina de configuración de CI-CD de nuestro proyecto podemos
+              indicar donde se encuentra el archivo de configuración.
+              <a href="https://docs.gitlab.com/ee/ci/yaml/" target="_blank"
+                >keyword reference</a
+              >
+            </small>
+          </section>
+          <section>
+            <img
+              data-src="https://github.com/MaraniMatias/gitlab-ci-talk/raw/master/image/gitlab-ci-file.jpg"
+            />
+          </section>
+        </section>
+
+        <section>
+          <section>Basic config</section>
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|1-4|6-12|14-22]
+           # **** Stages ****
+           stages:
+             - test
+             - build-deploy
+
+           # **** Jobs ****
+           test:
+             stage: test
+             script:
+               - nvm install 16.14.0
+               - yarn install --cache-folder .yarn
+               - yarn test
+
+           build-deploy:
+             stage: build-deploy
+             needs:
+               - test
+             script:
+               - nvm install 16.14.0 --silent
+               - yarn install --cache-folder .yarn
+               - yarn build
+               - ./my-deploy-script.sh
+           ```
+           </textarea
+            >
+          </section>
+          <section>
+            <img
+              data-src="https://github.com/MaraniMatias/gitlab-ci-talk/raw/master/image/example_1/example_000.png"
+            />
+          </section>
+        </section>
+
+        <section>
+          <section>
+            <p>Other config</p>
+            <small>Build and deploy to PRE and PRO</small>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|1-4|5-12|14-24|26-36|22-24,34-36]
+           # **** Stages ****
+           stages:
+             - test
+             - build-deploy
+
+           # **** Jobs ****
+           test:
+             stage: test
+             script:
+               - nvm install 16.14.0
+               - yarn install --cache-folder .yarn
+               - yarn test
+
+           build-deploy-pre:
+             stage: build-deploy
+             needs:
+               - test
+             script:
+               - nvm install 16.14.0 --silent
+               - yarn install --cache-folder .yarn
+               - yarn build
+               - ./my-deploy-script-pre.sh # To PRE
+             only:
+               - develop
+
+           build-deploy-pro:
+             stage: build-deploy
+             needs:
+               - test
+             script:
+               - nvm install 16.14.0 --silent
+               - yarn install --cache-folder .yarn
+               - yarn build
+               - ./my-deploy-script-pro.sh # To PRO
+             only:
+               - master
+           ```
+           </textarea
+            >
+          </section>
+        </section>
+
+        <section>
+          <section>
+            <p>Variables</p>
+            <small>
+              Variables in GitLab-CI, in the project, local and global.
+            </small>
+          </section>
+
+          <section>
+            <p>
+              Environment variables defined by us, in the configuration file, in
+              the project or on the same machine.
+            </p>
+            <p>
+              <small style="margin-top: 24px">
+                Variable predefined (on GitLab runner)
+                <a
+                  href="https://docs.gitlab.com/ee/ci/variables/predefined_variables.html"
+                  target="_blank"
+                >
+                  link doc
+                </a>
+              </small>
+            </p>
+          </section>
+
+          <section>
+            <img
+              data-src="https://raw.githubusercontent.com/MaraniMatias/gitlab-ci-talk/master/image/example_3/2022-09-29_11-34.png"
+            />
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|1-2|17,21-22|17,24|17,25|17,21,22,28|30,34,35,41]
+           variables:
+             HOST_DOMAIN: "my-domain.com"
+
+           # **** Stages ****
+           stages:
+             - test
+             - build-deploy
+
+           # **** Jobs ****
+           test:
+             stage: test
+             script:
+               - nvm install "$NODE_VERSION"
+               - yarn install --cache-folder .yarn
+               - yarn test
+
+           build-deploy-pre:
+             stage: build-deploy
+             needs:
+               - test
+             variables:
+               DOMAIN_DEPLOY: "$HOST_DOMAIN/pre"
+             script:
+               - echo "Run $CI_JOB_STAGE on $CI_COMMIT_BRANCH" >> "logger.log"
+               - nvm install "$NODE_VERSION" --silent
+               - yarn install --cache-folder .yarn
+               - yarn build
+               - ./my-deploy-script.sh "$DOMAIN_DEPLOY"
+
+           build-deploy-pro:
+             stage: build-deploy
+             needs:
+               - test
+             variables:
+               DOMAIN_DEPLOY: "$HOST_DOMAIN/pro"
+             script:
+               - echo "Run $CI_JOB_STAGE on $CI_COMMIT_BRANCH" >> "logger.log"
+               - nvm install "$NODE_VERSION" --silent
+               - yarn install --cache-folder .yarn
+               - yarn build
+               - ./my-deploy-script.sh "$DOMAIN_DEPLOY"
+             only:
+               - master
+           ```
+           </textarea
+            >
+          </section>
+        </section>
+
+        <section>
+          <section>
+            <p>Variables && Rules</p>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|1,3-6|8,10-11]
+           build-deploy-pre:
+            stage: build-deploy
+            rules:
+              - if: '$CI_COMMIT_BRANCH == "develop"'
+                when: manual
+              - when: never
+
+           build-deploy-pro:
+            stage: build-deploy
+            only:
+              - master
+           ```
+           </textarea
+            >
+          </section>
+          <section>
+            <img
+              data-src="https://raw.githubusercontent.com/MaraniMatias/gitlab-ci-talk/master/image/example_3/example_001.png"
+            />
+          </section>
+          <section>
+            <img
+              data-src="https://raw.githubusercontent.com/MaraniMatias/gitlab-ci-talk/master/image/example_3/example_000.png"
+            />
+          </section>
+        </section>
+
+        <section>
+          <section>
+            <p>Extend config and Before script</p>
+            <p>
+              <small>Beware of the rules and only</small>
+            </p>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|1-4|6-11|13-18|26,28,29|33,35-37,40|46,48-50,53]
+           .install-deps:
+             before_script:
+               - nvm install "$NODE_VERSION" --silent
+               - yarn install --cache-folder .yarn
+
+           .preproduction:
+             variables:
+               DOMAIN_DEPLOY: "$HOST_DOMAIN/pre"
+               ENV: "preproduction"
+             needs:
+               - test
+
+           .production:
+             variables:
+               DOMAIN_DEPLOY: "$HOST_DOMAIN/pro"
+               ENV: "production"
+             needs:
+               - test
+
+           # **** Stages ****
+           stages:
+             - test
+             - build-deploy
+
+           # **** Jobs ****
+           test:
+             stage: test
+             extends:
+               - .install-deps
+             script:
+               - yarn test
+
+           build-deploy-pre:
+             stage: build-deploy
+             extends:
+               - .install-deps
+               - .preproduction
+             script:
+               - yarn build
+               - ./my-deploy-script.sh "$DOMAIN_DEPLOY"
+             rules:
+               - if: '$CI_COMMIT_BRANCH == "develop"'
+                 when: manual
+               - when: never
+
+           build-deploy-pro:
+             stage: build-deploy
+             extends:
+               - .install-deps
+               - .production
+             script:
+               - yarn build
+               - ./my-deploy-script.sh "$DOMAIN_DEPLOY"
+             only:
+               - master
+           ```
+           </textarea
+            >
+          </section>
+        </section>
+        <!-- --->
+        <section>
+          <section>
+            <p>Show coverage on pipeline</p>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|7-9|10]
+           test:
+             stage: test
+             extends:
+               - .install-deps
+             script:
+               - yarn test
+             except:
+               - tags
+               - merge_requests
+             coverage: '/Lines\s*:\s*(\d+.?\d*)%/'
+           ```
+           </textarea
+            >
+          </section>
+          <section>
+            <img
+              data-src="https://raw.githubusercontent.com/MaraniMatias/gitlab-ci-talk/master/image/example_5/example_000.png"
+            />
+          </section>
+        </section>
+        <section>
+          <section>
+            <p>Cache</p>
+            <a
+              href="https://docs.gitlab.com/ee/ci/caching/#cache-nodejs-dependencies"
+              >Cache docs</a
+            >
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|5,9-15|17,19,20,23-29]
+           stages:
+             - install
+             - build
+
+           install:
+             stage: install
+             script:
+               - npm install
+             cache:
+               key:
+                 files:
+                   - package-lock.json
+               paths:
+                 - node_modules
+               policy: push
+
+           build:
+             stage: build
+             dependencies:
+               - install
+             script:
+               - npm run build
+             cache:
+               key:
+                 files:
+                   - package-lock.json
+               paths:
+                 - node_modules
+               policy: pull
+           ```
+           </textarea
+            >
+          </section>
+        </section>
+        <section>
+          <section>
+            <p>Artifacts</p>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|4,9-12]
+           stages:
+             - test
+
+           test:
+             stage: test
+             script:
+               - npm install
+               - npm run test --coverage
+             artifacts:
+               paths:
+                 - test_coverage.html
+               expire_in: 1 hour
+           ```
+           </textarea
+            >
+          </section>
+        </section>
+        <section>
+          <section>
+            <p>Cache y Artifacts</p>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+           ```yaml [0|10-15|16-19|21-34]
+           stages:
+             - install
+             - build
+             - deploy
+
+           install:
+             stage: install
+             script:
+               - npm install
+             cache:
+               key:
+                 files:
+                   - package-lock.json
+               paths:
+                 - .npm
+             artifacts:
+               paths:
+                 - node_modules
+               expire_in: 2 hour
+
+           build:
+             stage: build
+             dependencies:
+               - install
+             script:
+               - npm run build
+
+           deploy:
+             stage: deploy
+             dependencies:
+               - install
+               - build
+             script:
+               - bash ./deploy.sh
+           ```
+           </textarea
+            >
+          </section>
+        </section>
+        <section>
+          <p>The end</p>
+        </section>
+      </div>
+    </div>
+
+    <script src="./reveal.js"></script>
+    <script src="./plugin/notes/notes.js"></script>
+    <script src="./plugin/markdown/markdown.js"></script>
+    <script src="./plugin/highlight/highlight.js"></script>
+    <script>
+      // More info about initialization & config:
+      // - https://revealjs.com/initialization/
+      // - https://revealjs.com/config/
+      Reveal.initialize({
+        hash: true,
+
+        // Learn about plugins: https://revealjs.com/plugins/
+        plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+      });
+    </script>
+  </body>
+</html>
